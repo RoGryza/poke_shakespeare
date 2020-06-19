@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -euo pipefail
+
+cargo check
+cargo fmt -- --check
+cargo clippy -- -D clippy::pedantic -D clippy::all
+cargo test
