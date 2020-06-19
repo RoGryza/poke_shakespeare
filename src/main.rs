@@ -1,3 +1,5 @@
+use poke_shakespeare_lib::api;
+
 fn main() {
-    println!("Hello, world!");
+    rocket::ignite().mount("/", api()).launch();
 }
