@@ -2,9 +2,13 @@
 #![deny(clippy::pedantic)]
 #![feature(decl_macro)]
 
-use rocket::response::content;
-use rocket::{get, routes, Route};
+pub mod services;
+
+use rocket::{get, routes, Route, State};
+use rocket_contrib::json::Json;
 use serde::Serialize;
+
+use services::{BoxedPokeStore, BoxedTranslator, Result};
 
 #[derive(Serialize)]
 pub struct Pokemon {
@@ -13,14 +17,14 @@ pub struct Pokemon {
 }
 
 #[get("/pokemon/<name>")]
-fn pokemon(name: String) -> content::Json<String> {
-    content::Json(
-        serde_json::to_string(&Pokemon {
-            name,
-            description: "FooBar".into(),
-        })
-        .unwrap(),
-    )
+fn pokemon(
+    pokemon_store: State<BoxedPokeStore>,
+    translator: State<BoxedTranslator>,
+    name: String,
+) -> Result<Json<Pokemon>> {
+    let source_description = pokemon_store.get_description(&name)?;
+    let description = translator.translate(&source_description)?;
+    Ok(Json(Pokemon { name, description }))
 }
 
 pub fn api() -> Vec<Route> {
