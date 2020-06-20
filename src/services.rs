@@ -4,9 +4,9 @@ use std::iter::FromIterator;
 pub type Error = ();
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub type BoxedPokeStore = Box<dyn PokeStore + Send + Sync>;
+pub type BoxedPokeApi = Box<dyn PokeApi + Send + Sync>;
 
-pub trait PokeStore {
+pub trait PokeApi {
     fn get_description(&self, name: &str) -> Result<String>;
 }
 
@@ -17,30 +17,30 @@ pub trait Translator {
 }
 
 #[derive(Clone, Default)]
-pub struct DummyPokeStore(HashMap<String, String>);
+pub struct DummyPokeApi(HashMap<String, String>);
 
-impl DummyPokeStore {
+impl DummyPokeApi {
     pub fn new(map: HashMap<String, String>) -> Self {
         map.into()
     }
 }
 
-impl FromIterator<(String, String)> for DummyPokeStore {
+impl FromIterator<(String, String)> for DummyPokeApi {
     fn from_iter<T>(iter: T) -> Self
     where
         T: IntoIterator<Item = (String, String)>,
     {
-        DummyPokeStore(iter.into_iter().collect())
+        DummyPokeApi(iter.into_iter().collect())
     }
 }
 
-impl From<HashMap<String, String>> for DummyPokeStore {
+impl From<HashMap<String, String>> for DummyPokeApi {
     fn from(map: HashMap<String, String>) -> Self {
-        DummyPokeStore(map)
+        DummyPokeApi(map)
     }
 }
 
-impl PokeStore for DummyPokeStore {
+impl PokeApi for DummyPokeApi {
     fn get_description(&self, name: &str) -> Result<String> {
         match self.0.get(name) {
             Some(s) => Ok(s.into()),

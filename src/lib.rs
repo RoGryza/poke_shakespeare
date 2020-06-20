@@ -1,5 +1,3 @@
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
 #![feature(decl_macro)]
 
 pub mod services;
@@ -8,7 +6,7 @@ use rocket::{get, routes, Route, State};
 use rocket_contrib::json::Json;
 use serde::Serialize;
 
-use services::{BoxedPokeStore, BoxedTranslator, Result};
+use services::{BoxedPokeApi, BoxedTranslator, Result};
 
 #[derive(Serialize)]
 pub struct Pokemon {
@@ -18,11 +16,11 @@ pub struct Pokemon {
 
 #[get("/pokemon/<name>")]
 fn pokemon(
-    pokemon_store: State<BoxedPokeStore>,
+    pokeapi: State<BoxedPokeApi>,
     translator: State<BoxedTranslator>,
     name: String,
 ) -> Result<Json<Pokemon>> {
-    let source_description = pokemon_store.get_description(&name)?;
+    let source_description = pokeapi.get_description(&name)?;
     let description = translator.translate(&source_description)?;
     Ok(Json(Pokemon { name, description }))
 }
