@@ -1,6 +1,6 @@
 use poke_shakespeare_lib::poke_shakespeare;
-use poke_shakespeare_lib::services::PokeApiClient;
+use poke_shakespeare_lib::services::{FunTranslationsApi, PokeApiClient};
 
 fn main() {
-    poke_shakespeare(PokeApiClient::default(), |s: &str| Ok(s.to_string())).launch();
+    poke_shakespeare(PokeApiClient::default(), FunTranslationsApi::default()).launch();
 }

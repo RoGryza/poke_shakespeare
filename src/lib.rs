@@ -109,9 +109,10 @@ mod test {
     #[test]
     #[ignore]
     fn test_api_integration() {
-        let rocket = poke_shakespeare(services::PokeApiClient::default(), |s: &str| {
-            Ok(s.to_string())
-        });
+        let rocket = poke_shakespeare(
+            services::PokeApiClient::default(),
+            services::FunTranslationsApi::default(),
+        );
         let client = Client::new(rocket).unwrap();
         let response = client.get("/pokemon/notfound").dispatch();
         assert_eq!(response.status(), Status::NotFound);
