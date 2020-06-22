@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 log = "0.4.8"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
 rocket = "0.4.5"
 rocket_contrib = "0.4.5"
 serde = { version = "1", features = ["derive"] }

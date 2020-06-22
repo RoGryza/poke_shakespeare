@@ -106,6 +106,19 @@ mod test {
         assert_eq!(response.status(), Status::BadRequest);
     }
 
+    #[test]
+    #[ignore]
+    fn test_api_integration() {
+        let rocket = poke_shakespeare(services::PokeApiClient::default(), |s: &str| {
+            Ok(s.to_string())
+        });
+        let client = Client::new(rocket).unwrap();
+        let response = client.get("/pokemon/notfound").dispatch();
+        assert_eq!(response.status(), Status::NotFound);
+        let response = client.get("/pokemon/butterfree").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+    }
+
     fn json_get<T>(client: &Client, endpoint: &str) -> (Status, T)
     where
         T: DeserializeOwned,
