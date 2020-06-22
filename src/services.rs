@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
-pub type Error = ();
-pub type Result<T> = std::result::Result<T, Error>;
+use anyhow::Result;
 
 pub type BoxedPokeApi = Box<dyn PokeApi + Send + Sync>;
 
 pub trait PokeApi {
-    fn get_description(&self, name: &str) -> Result<String>;
+    fn get_description(&self, name: &str) -> Result<Option<String>>;
 }
 
 pub type BoxedTranslator = Box<dyn Translator + Send + Sync>;
@@ -41,11 +40,8 @@ impl From<HashMap<String, String>> for DummyPokeApi {
 }
 
 impl PokeApi for DummyPokeApi {
-    fn get_description(&self, name: &str) -> Result<String> {
-        match self.0.get(name) {
-            Some(s) => Ok(s.into()),
-            None => Err(()),
-        }
+    fn get_description(&self, name: &str) -> Result<Option<String>> {
+        Ok(self.0.get(name).map(String::from))
     }
 }
 

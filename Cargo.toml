@@ -13,6 +13,8 @@ name = "poke_shakespeare"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1"
+log = "0.4.8"
 rocket = "0.4.5"
 rocket_contrib = "0.4.5"
 serde = { version = "1", features = ["derive"] }
