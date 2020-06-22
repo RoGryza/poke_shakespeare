@@ -5,13 +5,24 @@ pub mod services;
 
 use rocket::http::{RawStr, Status};
 use rocket::response::status;
-use rocket::{get, routes, Route, State};
+use rocket::{get, routes, Rocket, State};
 use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
-pub use api::SerializeErrors;
-use api::{Alpha, Error as ApiError, Result as ApiResult};
-use services::{BoxedPokeApi, BoxedTranslator};
+use api::{Alpha, Error as ApiError, Result as ApiResult, SerializeErrors};
+use services::{BoxedPokeApi, BoxedTranslator, PokeApi, Translator};
+
+pub fn poke_shakespeare<P, T>(pokeapi: P, translator: T) -> Rocket
+where
+    P: 'static + PokeApi + Send + Sync,
+    T: 'static + Translator + Send + Sync,
+{
+    rocket::ignite()
+        .attach(SerializeErrors)
+        .manage(BoxedPokeApi::from(Box::new(pokeapi)))
+        .manage(BoxedTranslator::from(Box::new(translator)))
+        .mount("/", routes![pokemon, pokemon_badrequest])
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Pokemon {
@@ -42,10 +53,6 @@ fn pokemon_badrequest(_name: &RawStr) -> status::BadRequest<()> {
     status::BadRequest(None)
 }
 
-pub fn api() -> Vec<Route> {
-    routes![pokemon, pokemon_badrequest]
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -53,22 +60,17 @@ mod test {
     use rocket::http::ContentType;
     use rocket::local::Client;
     use serde::de::DeserializeOwned;
-    use services::{DummyPokeApi, DummyTranslator};
 
     #[test]
     fn test_pokemon_ok() {
-        let rocket = rocket::ignite()
-            .attach(SerializeErrors)
-            .manage(BoxedPokeApi::from(Box::new(
-                vec![
-                    ("foo".to_string(), "desc foo".to_string()),
-                    ("bar".to_string(), "my name is bar".to_string()),
-                ]
-                .into_iter()
-                .collect::<DummyPokeApi>(),
-            )))
-            .manage(BoxedTranslator::from(Box::new(DummyTranslator::new())))
-            .mount("/", api());
+        let rocket = poke_shakespeare(
+            |name: &str| match name {
+                "foo" => Ok(Some("desc foo".to_string())),
+                "bar" => Ok(Some("my name is bar".to_string())),
+                _ => Ok(None),
+            },
+            |source: &str| Ok(format!("TRANSLATED: {}", source)),
+        );
         let client = Client::new(rocket).unwrap();
 
         assert_eq!(
@@ -96,11 +98,7 @@ mod test {
 
     #[test]
     fn test_invalid_param_responds_bad_request() {
-        let rocket = rocket::ignite()
-            .attach(SerializeErrors)
-            .manage(BoxedPokeApi::from(Box::new(DummyPokeApi::default())))
-            .manage(BoxedTranslator::from(Box::new(DummyTranslator::new())))
-            .mount("/", api());
+        let rocket = poke_shakespeare(|_: &str| Ok(None), |s: &str| Ok(s.to_string()));
         let client = Client::new(rocket).unwrap();
         let response = client.get("/pokemon/12").dispatch();
         assert_eq!(response.status(), Status::BadRequest);
