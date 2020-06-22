@@ -3,11 +3,13 @@
 mod api;
 pub mod services;
 
-use rocket::http::Status;
+use rocket::http::{RawStr, Status};
+use rocket::response::status;
 use rocket::{get, routes, Route, State};
 use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
+pub use api::SerializeErrors;
 use api::{Alpha, Error as ApiError, Result as ApiResult};
 use services::{BoxedPokeApi, BoxedTranslator};
 
@@ -35,24 +37,28 @@ fn pokemon(
     }
 }
 
+#[get("/pokemon/<_name>", rank = 2)]
+fn pokemon_badrequest(_name: &RawStr) -> status::BadRequest<()> {
+    status::BadRequest(None)
+}
+
 pub fn api() -> Vec<Route> {
-    routes![pokemon]
+    routes![pokemon, pokemon_badrequest]
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use anyhow::{bail, Result};
-    use api::ErrorPayload;
     use rocket::http::ContentType;
     use rocket::local::Client;
     use serde::de::DeserializeOwned;
-    use services::{DummyPokeApi, DummyTranslator, PokeApi};
+    use services::{DummyPokeApi, DummyTranslator};
 
     #[test]
     fn test_pokemon_ok() {
         let rocket = rocket::ignite()
+            .attach(SerializeErrors)
             .manage(BoxedPokeApi::from(Box::new(
                 vec![
                     ("foo".to_string(), "desc foo".to_string()),
@@ -89,29 +95,17 @@ mod test {
     }
 
     #[test]
-    fn test_errors_sent_as_json() {
-        struct TestPokeApi;
-        impl PokeApi for TestPokeApi {
-            fn get_description(&self, name: &str) -> Result<Option<String>> {
-                match name {
-                    "notfound" => Ok(None),
-                    _ => bail!("Never works!"),
-                }
-            }
-        }
-
+    fn test_invalid_param_responds_bad_request() {
         let rocket = rocket::ignite()
-            .manage(BoxedPokeApi::from(Box::new(TestPokeApi)))
+            .attach(SerializeErrors)
+            .manage(BoxedPokeApi::from(Box::new(DummyPokeApi::default())))
             .manage(BoxedTranslator::from(Box::new(DummyTranslator::new())))
             .mount("/", api());
         let client = Client::new(rocket).unwrap();
-
-        json_get_err(&client, "/pokemon/notfound", Status::NotFound);
-        json_get_err(&client, "/foo", Status::NotFound);
-        json_get_err(&client, "/pokemon", Status::NotFound);
-        json_get_err(&client, "/pokemon/", Status::NotFound);
-        json_get_err(&client, "/pokemon/12", Status::BadRequest);
-        json_get_err(&client, "/pokemon/foo", Status::InternalServerError);
+        let response = client.get("/pokemon/12").dispatch();
+        assert_eq!(response.status(), Status::BadRequest);
+        let response = client.get("/pokemon/foo&20bar").dispatch();
+        assert_eq!(response.status(), Status::BadRequest);
     }
 
     fn json_get<T>(client: &Client, endpoint: &str) -> (Status, T)
@@ -122,11 +116,5 @@ mod test {
         assert_eq!(response.content_type(), Some(ContentType::JSON));
         let bytes = response.body_bytes().expect("Body must not be empty");
         (response.status(), serde_json::from_slice(&bytes).unwrap())
-    }
-
-    fn json_get_err(client: &Client, endpoint: &str, status: Status) {
-        let (st, payload) = json_get(client, endpoint);
-        assert_eq!(st, status);
-        assert_eq!(ErrorPayload::new(st.reason), payload);
     }
 }
