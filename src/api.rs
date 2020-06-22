@@ -6,7 +6,7 @@ use rocket::request::FromParam;
 use rocket::response::{status, Responder, Result as ResponseResult};
 use rocket::Request;
 use rocket_contrib::json::Json;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 
 pub type Result<T> = std::result::Result<Json<T>, Error>;
 
@@ -14,6 +14,17 @@ pub type Result<T> = std::result::Result<Json<T>, Error>;
 pub enum Error {
     Status(Status),
     Other(anyhow::Error),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErrorPayload {
+    pub error: String,
+}
+
+impl ErrorPayload {
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        ErrorPayload { error: s.into() }
+    }
 }
 
 impl<E> From<E> for Error
@@ -34,7 +45,7 @@ impl<'r> Responder<'r> for Error {
                 Status::InternalServerError
             }
         };
-        status::Custom(status, Json(json!({ "error": status.reason }))).respond_to(request)
+        status::Custom(status, Json(ErrorPayload::new(status.reason))).respond_to(request)
     }
 }
 
@@ -60,11 +71,28 @@ impl<'r> FromParam<'r> for Alpha {
 
     fn from_param(param: &'r RawStr) -> std::result::Result<Self, Self::Error> {
         String::from_param(param).and_then(|s| {
-            if s.chars().all(char::is_alphabetic) {
+            if !s.is_empty() && s.chars().all(char::is_alphabetic) {
                 Ok(Alpha(s))
             } else {
                 Err(param)
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_alpha_parse_ok() {
+        Alpha::from_param("foo".into()).unwrap();
+    }
+
+    #[test]
+    fn test_alpha_parse_invalid() {
+        Alpha::from_param("".into()).unwrap_err();
+        Alpha::from_param("123".into()).unwrap_err();
+        Alpha::from_param(".".into()).unwrap_err();
     }
 }
