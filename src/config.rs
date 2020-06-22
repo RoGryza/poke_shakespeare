@@ -8,7 +8,7 @@ use serde::de::Deserializer;
 use serde::Deserialize;
 
 use crate::api::Alpha;
-use crate::services::{BoxedPokeApi, BoxedTranslator, FunTranslationsApi, PokeApiClient};
+use crate::services::{BoxedPokeApi, BoxedTranslator, Cache, FunTranslationsApi, PokeApiClient};
 
 pub struct ReadConfig;
 
@@ -22,6 +22,14 @@ impl Fairing for ReadConfig {
 
     fn on_attach(&self, rocket: Rocket) -> Result<Rocket, Rocket> {
         let cfg = rocket.config();
+
+        let cache_size = cfg.get_int("cache_size").unwrap_or(4096);
+        if cache_size <= 0 {
+            error!("Invalid cache size {}", cache_size);
+            return Err(rocket);
+        }
+        let cache: Cache = Cache::new(cache_size as usize);
+
         let pokeapi = match cfg.get_extra("pokeapi").and_then(|v| {
             v.clone().try_into::<PokeApiConfig>().map_err(|e| {
                 ConfigError::ParseError(
@@ -58,7 +66,7 @@ impl Fairing for ReadConfig {
             }
         };
 
-        Ok(rocket.manage(pokeapi).manage(translator))
+        Ok(rocket.manage(cache).manage(pokeapi).manage(translator))
     }
 }
 

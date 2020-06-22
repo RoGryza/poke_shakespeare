@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use api::{Alpha, Error as ApiError, Result as ApiResult, SerializeErrors};
 use config::ReadConfig;
-use services::{BoxedPokeApi, BoxedTranslator, PokeApi, Translator};
+use services::{BoxedPokeApi, BoxedTranslator, Cache, PokeApi, Translator};
 
 pub trait RocketExt {
     fn poke_shakespeare(self) -> Self;
@@ -37,6 +37,7 @@ impl RocketExt for Rocket {
         self.attach(SerializeErrors)
             .manage(BoxedPokeApi::from(Box::new(pokeapi)))
             .manage(BoxedTranslator::from(Box::new(translator)))
+            .manage(Cache::new(1))
             .mount("/", routes![pokemon, pokemon_badrequest])
     }
 }
@@ -51,16 +52,19 @@ pub struct Pokemon {
 fn pokemon(
     pokeapi: State<BoxedPokeApi>,
     translator: State<BoxedTranslator>,
+    cache: State<Cache>,
     name: Alpha,
 ) -> ApiResult<Pokemon> {
-    match pokeapi.get_description(&name)? {
-        Some(source_description) => {
-            let description = translator.translate(&source_description)?;
-            Ok(Json(Pokemon {
-                name: name.into(),
-                description,
-            }))
-        }
+    let cached =
+        cache.get_or_calculate(name.clone(), || match pokeapi.get_description(&name)? {
+            Some(source_description) => translator.translate(&source_description).map(Some),
+            None => Ok(None),
+        })?;
+    match cached {
+        Some(description) => Ok(Json(Pokemon {
+            name: name.into(),
+            description,
+        })),
         None => Err(ApiError::Status(Status::NotFound)),
     }
 }

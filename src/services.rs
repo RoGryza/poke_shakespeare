@@ -1,9 +1,12 @@
 use anyhow::{anyhow, Context, Result};
-
 use log::warn;
 use serde::{Deserialize, Serialize};
 pub type BoxedPokeApi = Box<dyn PokeApi + Send + Sync>;
+use lru::LruCache;
 use reqwest::header::HeaderMap;
+use std::sync::Mutex;
+
+use crate::api::Alpha;
 
 pub trait PokeApi {
     fn get_description(&self, name: &str) -> Result<Option<String>>;
@@ -153,6 +156,30 @@ impl Translator for FunTranslationsApi {
                 resp.text()
                     .unwrap_or("<API responded with empty body or unformattable text>".into())
             )),
+        }
+    }
+}
+
+pub struct Cache(Mutex<LruCache<Alpha, Option<String>>>);
+
+impl Cache {
+    pub fn new(capacity: usize) -> Self {
+        Cache(Mutex::new(LruCache::new(capacity)))
+    }
+}
+
+impl Cache {
+    pub fn get_or_calculate<F>(&self, k: Alpha, f: F) -> Result<Option<String>>
+    where
+        F: FnOnce() -> Result<Option<String>>,
+    {
+        let mut inner = self.0.lock().unwrap();
+        if let Some(v) = inner.get(&k) {
+            Ok(v.clone())
+        } else {
+            let v = f()?;
+            inner.put(k, v.clone());
+            Ok(v)
         }
     }
 }
