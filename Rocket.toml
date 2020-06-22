@@ -1,0 +1,4 @@
+[development]
+funtranslations.mock = true
+pokeapi.mock.bulbasaur = "A bulbasaur!"
+pokeapi.mock.charmander = "Not a bulbasaur!"

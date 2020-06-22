@@ -7,6 +7,7 @@ use rocket::request::FromParam;
 use rocket::response::{status, Responder, Result as ResponseResult};
 use rocket::{Request, Response};
 use rocket_contrib::json::Json;
+use serde::de::{Deserializer, Error as _, Unexpected};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 
@@ -83,8 +84,18 @@ impl<'r> Responder<'r> for Error {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Alpha(String);
+
+impl Alpha {
+    pub fn try_new(s: String) -> Option<Self> {
+        if !s.is_empty() && s.chars().all(char::is_alphabetic) {
+            Some(Alpha(s))
+        } else {
+            None
+        }
+    }
+}
 
 impl Into<String> for Alpha {
     fn into(self) -> String {
@@ -104,12 +115,20 @@ impl<'r> FromParam<'r> for Alpha {
     type Error = &'r RawStr;
 
     fn from_param(param: &'r RawStr) -> std::result::Result<Self, Self::Error> {
-        String::from_param(param).and_then(|s| {
-            if !s.is_empty() && s.chars().all(char::is_alphabetic) {
-                Ok(Alpha(s))
-            } else {
-                Err(param)
-            }
+        String::from_param(param).and_then(|s| Alpha::try_new(s).ok_or(param))
+    }
+}
+
+impl<'de> Deserialize<'de> for Alpha {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Alpha, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer).and_then(|s| {
+            Alpha::try_new(s.clone()).ok_or(D::Error::invalid_value(
+                Unexpected::Str(&s),
+                &"an alpha string",
+            ))
         })
     }
 }

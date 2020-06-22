@@ -1,6 +1,5 @@
-use poke_shakespeare_lib::poke_shakespeare;
-use poke_shakespeare_lib::services::{FunTranslationsApi, PokeApiClient};
+use poke_shakespeare_lib::RocketExt;
 
 fn main() {
-    poke_shakespeare(PokeApiClient::default(), FunTranslationsApi::default()).launch();
+    rocket::ignite().poke_shakespeare().launch();
 }

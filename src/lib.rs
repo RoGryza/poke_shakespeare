@@ -1,6 +1,7 @@
 #![feature(decl_macro)]
 
 mod api;
+mod config;
 pub mod services;
 
 use rocket::http::{RawStr, Status};
@@ -10,18 +11,34 @@ use rocket_contrib::json::Json;
 use serde::{Deserialize, Serialize};
 
 use api::{Alpha, Error as ApiError, Result as ApiResult, SerializeErrors};
+use config::ReadConfig;
 use services::{BoxedPokeApi, BoxedTranslator, PokeApi, Translator};
 
-pub fn poke_shakespeare<P, T>(pokeapi: P, translator: T) -> Rocket
-where
-    P: 'static + PokeApi + Send + Sync,
-    T: 'static + Translator + Send + Sync,
-{
-    rocket::ignite()
-        .attach(SerializeErrors)
-        .manage(BoxedPokeApi::from(Box::new(pokeapi)))
-        .manage(BoxedTranslator::from(Box::new(translator)))
-        .mount("/", routes![pokemon, pokemon_badrequest])
+pub trait RocketExt {
+    fn poke_shakespeare(self) -> Self;
+    fn poke_shakespeare_custom<P, T>(self, pokeapi: P, translator: T) -> Self
+    where
+        P: 'static + PokeApi + Send + Sync,
+        T: 'static + Translator + Send + Sync;
+}
+
+impl RocketExt for Rocket {
+    fn poke_shakespeare(self) -> Self {
+        self.attach(SerializeErrors)
+            .attach(ReadConfig)
+            .mount("/", routes![pokemon, pokemon_badrequest])
+    }
+
+    fn poke_shakespeare_custom<P, T>(self, pokeapi: P, translator: T) -> Self
+    where
+        P: 'static + PokeApi + Send + Sync,
+        T: 'static + Translator + Send + Sync,
+    {
+        self.attach(SerializeErrors)
+            .manage(BoxedPokeApi::from(Box::new(pokeapi)))
+            .manage(BoxedTranslator::from(Box::new(translator)))
+            .mount("/", routes![pokemon, pokemon_badrequest])
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -57,13 +74,14 @@ fn pokemon_badrequest(_name: &RawStr) -> status::BadRequest<()> {
 mod test {
     use super::*;
 
+    use rocket::config::{Config, Environment};
     use rocket::http::ContentType;
     use rocket::local::Client;
     use serde::de::DeserializeOwned;
 
     #[test]
     fn test_pokemon_ok() {
-        let rocket = poke_shakespeare(
+        let rocket = rocket::custom(Config::new(Environment::Development)).poke_shakespeare_custom(
             |name: &str| match name {
                 "foo" => Ok(Some("desc foo".to_string())),
                 "bar" => Ok(Some("my name is bar".to_string())),
@@ -98,7 +116,8 @@ mod test {
 
     #[test]
     fn test_invalid_param_responds_bad_request() {
-        let rocket = poke_shakespeare(|_: &str| Ok(None), |s: &str| Ok(s.to_string()));
+        let rocket = rocket::custom(Config::new(Environment::Development))
+            .poke_shakespeare_custom(|_: &str| Ok(None), |s: &str| Ok(s.to_string()));
         let client = Client::new(rocket).unwrap();
         let response = client.get("/pokemon/12").dispatch();
         assert_eq!(response.status(), Status::BadRequest);
@@ -109,10 +128,7 @@ mod test {
     #[test]
     #[ignore]
     fn test_api_integration() {
-        let rocket = poke_shakespeare(
-            services::PokeApiClient::default(),
-            services::FunTranslationsApi::default(),
-        );
+        let rocket = rocket::custom(Config::new(Environment::Development)).poke_shakespeare();
         let client = Client::new(rocket).unwrap();
         let response = client.get("/pokemon/notfound").dispatch();
         assert_eq!(response.status(), Status::NotFound);
