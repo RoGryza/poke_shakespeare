@@ -1,3 +1,4 @@
+//! Implementation and abstractions for external services.
 use anyhow::{anyhow, Context, Result};
 use log::warn;
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,10 @@ use std::sync::Mutex;
 
 use crate::api::Alpha;
 
+/// Abstraction for Poke API access.
 pub trait PokeApi {
+    /// Fetches Pokemon descriptions given their name. Returns `Ok(None)` when either the pokemon
+    /// doesn't exist or it has no english descriptions.
     fn get_description(&self, name: &str) -> Result<Option<String>>;
 }
 
@@ -21,6 +25,7 @@ where
     }
 }
 
+/// Poke API accessor. Use the `Default` implementation for the public API at https://pokeapi.co.
 pub struct PokeApiClient {
     pub url: String,
 }
@@ -82,7 +87,9 @@ impl PokeApi for PokeApiClient {
 
 pub type BoxedTranslator = Box<dyn Translator + Send + Sync>;
 
+/// Translation service abstraction.
 pub trait Translator {
+    /// Translates the given source string to Shakespearean text.
     fn translate(&self, source: &str) -> Result<String>;
 }
 
@@ -95,6 +102,8 @@ where
     }
 }
 
+/// Translation service using the Fun Translations API. Use the `Default` instance to use the
+/// public API at https://api.funtranslations.com.
 pub struct FunTranslationsApi {
     pub url: String,
     pub api_key: Option<String>,

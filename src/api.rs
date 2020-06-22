@@ -1,3 +1,4 @@
+//! API and Rocket-related types
 use std::ops::Deref;
 
 use log::error;
@@ -11,6 +12,7 @@ use serde::de::{Deserializer, Error as _, Unexpected};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 
+/// JSON payload sent by the server on HTTP errors
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ErrorPayload {
     pub error: String,
@@ -28,6 +30,8 @@ impl From<Status> for ErrorPayload {
     }
 }
 
+/// `Fairing` which serializes all 4xx and 5xx HTTP errors as JSON. Formats the body as
+/// `JsonPayload`.
 #[derive(Clone, Copy, Debug)]
 pub struct SerializeErrors;
 
@@ -56,6 +60,8 @@ impl Fairing for SerializeErrors {
 
 pub type Result<T> = std::result::Result<Json<T>, Error>;
 
+/// API error response type. Use `Status` for user-facing errors and `Other` for internal errors.
+/// `Other` errors are logged.
 #[derive(Debug)]
 pub enum Error {
     Status(Status),
@@ -84,10 +90,15 @@ impl<'r> Responder<'r> for Error {
     }
 }
 
+/// String containing only alphabetic characters.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Alpha(String);
 
 impl Alpha {
+    /// Validates a string and constructs a new `Alpha`, returns `None` if the input is invalid.
+    ///
+    /// This type implements `FromParam` and `Deserialize`, so it can be used for validation in
+    /// rocket and serde, respectively.
     pub fn try_new(s: String) -> Option<Self> {
         if !s.is_empty() && s.chars().all(char::is_alphabetic) {
             Some(Alpha(s))

@@ -1,3 +1,5 @@
+//! This module handles application-specific configuration in the Rocket.toml file. See
+//! `ReadConfig`.
 use std::collections::HashMap;
 
 use log::error;
@@ -10,6 +12,21 @@ use serde::Deserialize;
 use crate::api::Alpha;
 use crate::services::{BoxedPokeApi, BoxedTranslator, Cache, FunTranslationsApi, PokeApiClient};
 
+/// Fairing which parses extra configuration on launch and instantiates the necessary services. The
+/// following config keys are defined:
+///
+/// * cache_size(integer): Max translations to keep cached, defaults to 4096.
+/// * pokeapi.mock(table): Mapping of pokemon names to descriptions. If specified, the application
+/// references this table instead of fetching descriptions from PokeAPI.
+/// * pokeapi.url(string): Pokemon species endpoint, defaults to
+/// https://pokeapi.co/api/v2/pokemon-species/.
+/// * funtranslations.mock(boolean): if true, the application will do mock translations instead of
+/// accessing the Fun Translations API.
+/// * funtranslations.url(string): Shakespeare translation endpoint, defaults to
+/// https://api.funtranslations.com/translate/shakespeare/.
+/// * funtranslations.api_key(string): Secret to authenticate the Fun Translations API with. If
+/// unspecified, API calls will be unauthenticated. Note that unauthenticated calls are
+/// rate-limited.
 pub struct ReadConfig;
 
 impl Fairing for ReadConfig {

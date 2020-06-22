@@ -1,3 +1,16 @@
+//! poke_shakespeare is an web API which translates Pokémon descriptions to Shakespearean text
+//! using the public PokeAPI and Fun Translations APIs.
+//!
+//! The application is defined using the `RocketExt` trait, you can serve it from a `Rocket`
+//! instance by calling `poke_shakespeare` on it:
+//!
+//! ```ignore
+//! use poke_shakespeare_lib::RocketExt;
+//!
+//! fn main() {
+//!     rocket::ignite().poke_shakespeare().launch();
+//! }
+//! ```
 #![feature(decl_macro)]
 
 mod api;
@@ -14,8 +27,11 @@ use api::{Alpha, Error as ApiError, Result as ApiResult, SerializeErrors};
 use config::ReadConfig;
 use services::{BoxedPokeApi, BoxedTranslator, Cache, PokeApi, Translator};
 
+/// Extends `Rocket` instances to serve the poke_shakespeare API.
 pub trait RocketExt {
+    /// Mounts the poke_shakespeare endpoints and instantiates services from the configuration.
     fn poke_shakespeare(self) -> Self;
+    /// Mounts the poke_shakespeare endpoints and uses the given service instances.
     fn poke_shakespeare_custom<P, T>(self, pokeapi: P, translator: T) -> Self
     where
         P: 'static + PokeApi + Send + Sync,
@@ -42,6 +58,7 @@ impl RocketExt for Rocket {
     }
 }
 
+/// /pokemon response
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Pokemon {
     pub name: String,
